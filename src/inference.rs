@@ -7,18 +7,23 @@ pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, S
     let mut field_types: HashMap<String, ColumnType> = HashMap::new();
     let mut record_count = 0;
 
-    for (line_number, line) in content.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    let values: Vec<Value> = {
+        let trimmed = content.trim();
+        if trimmed.starts_with('[') {
+            // JSON array
+            serde_json::from_str(trimmed).map_err(|e| format!("Error parsing JSON array: {}", e))?
+        } else {
+            // Stream of JSON objects (NDJSON or concatenated pretty-printed)
+            serde_json::Deserializer::from_str(trimmed)
+                .into_iter::<Value>()
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Error parsing JSON: {}", e))?
         }
-        let value: Value = serde_json::from_str(line)
-            .map_err(|e| format!("Error parsing line {}: {}", line_number + 1, e))?;
+    };
+
+    for (i, value) in values.into_iter().enumerate() {
         let obj = value.as_object().ok_or_else(|| {
-            format!(
-                "line {}: expected a JSON object, got smt else",
-                line_number + 1
-            )
+            format!("record {}: expected a JSON object, got something else", i + 1)
         })?;
 
         for (key, value) in obj {
