@@ -4,11 +4,15 @@ mod inference;
 mod generator;
 
 use std::fs;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use generator::Generator;
 
 fn main() {
-      let args = cli::Args::parse();
+      let args = cli::Args::try_parse().unwrap_or_else(|_| {
+          cli::Args::command().print_help().unwrap();
+          println!();
+          std::process::exit(0);
+      });
 
       let table_name = args.name.unwrap_or_else(|| {
           args.input
