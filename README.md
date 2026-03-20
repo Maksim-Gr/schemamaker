@@ -4,25 +4,25 @@ Generate ClickHouse migration SQL from a JSON file. Replaces the `create_ddl_for
 
 ## Install
 
-Download the latest binary for your platform from the [Releases](https://github.com/Maksim-Gr/schemamaker/releases) page.
+Download the binary for your platform from the [v0.1.0-beta release](https://github.com/Maksim-Gr/schemamaker/releases/tag/v0.1.0-beta).
 
 **macOS (Apple Silicon)**
 ```bash
-curl -L https://github.com/Maksim-Gr/schemamaker/releases/latest/download/schemamaker-macos-arm64.tar.gz | tar -xz
+curl -L https://github.com/Maksim-Gr/schemamaker/releases/download/v0.1.0-beta/schemamaker-macos-arm64.tar.gz | tar -xz
 chmod +x schemamaker-macos-arm64
 mv schemamaker-macos-arm64 /usr/local/bin/schemamaker
 ```
 
 **macOS (Intel)**
 ```bash
-curl -L https://github.com/Maksim-Gr/schemamaker/releases/latest/download/schemamaker-macos-x86_64.tar.gz | tar -xz
+curl -L https://github.com/Maksim-Gr/schemamaker/releases/download/v0.1.0-beta/schemamaker-macos-x86_64.tar.gz | tar -xz
 chmod +x schemamaker-macos-x86_64
 mv schemamaker-macos-x86_64 /usr/local/bin/schemamaker
 ```
 
 **Linux (x86_64)**
 ```bash
-curl -L https://github.com/Maksim-Gr/schemamaker/releases/latest/download/schemamaker-linux-x86_64.tar.gz | tar -xz
+curl -L https://github.com/Maksim-Gr/schemamaker/releases/download/v0.1.0-beta/schemamaker-linux-x86_64.tar.gz | tar -xz
 chmod +x schemamaker-linux-x86_64
 mv schemamaker-linux-x86_64 /usr/local/bin/schemamaker
 ```
