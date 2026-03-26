@@ -16,13 +16,11 @@ impl<'a> Generator<'a> {
     }
 
     pub fn generate_up(&self) -> String {
-        vec![
-            self.streams_table(),
+        [self.streams_table(),
             self.raw_table(),
             self.datalake_table(),
             self.raw_mv(),
-            self.streams_mv(),
-        ]
+            self.streams_mv()]
         .join("\n\n")
     }
 
