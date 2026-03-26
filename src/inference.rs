@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, String> {
     let mut field_order: Vec<String> = Vec::new();
     let mut field_types: HashMap<String, ColumnType> = HashMap::new();
+    let mut field_seen: HashMap<String, usize> = HashMap::new(); // how many records contained this field
     let mut record_count = 0;
 
     let values: Vec<Value> = {
@@ -23,7 +24,10 @@ pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, S
 
     for (i, value) in values.into_iter().enumerate() {
         let obj = value.as_object().ok_or_else(|| {
-            format!("record {}: expected a JSON object, got something else", i + 1)
+            format!(
+                "record {}: expected a JSON object, got something else",
+                i + 1
+            )
         })?;
 
         for (key, value) in obj {
@@ -34,6 +38,7 @@ pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, S
                 field_order.push(key.clone());
                 field_types.insert(key.clone(), inferred);
             }
+            *field_seen.entry(key.clone()).or_insert(0) += 1;
         }
         record_count += 1;
     }
@@ -45,14 +50,27 @@ pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, S
         .into_iter()
         .map(|name| {
             let ch_type = field_types.remove(&name).unwrap();
-            Column { name, ch_type }
+            let seen = *field_seen.get(&name).unwrap_or(&0);
+            // A field is nullable if it was missing from at least one record
+            let nullable = seen < record_count;
+            Column {
+                name,
+                ch_type,
+                nullable,
+            }
         })
         .collect();
-    eprintln!(
-        "Inferred {} columns from {} records",
-        columns.len(),
-        record_count
-    );
+
+    let max_len = columns.iter().map(|c| c.name.len()).max().unwrap_or(0);
+    eprintln!("{} columns infered from {}\n", columns.len(), table_name);
+    for col in &columns {
+        eprintln!(
+            "  {:<width$}  {}",
+            col.name,
+            col.ch_type.as_str(),
+            width = max_len
+        );
+    }
     Ok(InferredSchema {
         table_name: table_name.to_string(),
         columns,

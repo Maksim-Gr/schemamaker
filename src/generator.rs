@@ -8,17 +8,19 @@ pub struct Generator<'a> {
 
 impl<'a> Generator<'a> {
     pub fn new(schema: &'a InferredSchema, cluster: String, kafka: String) -> Self {
-        Generator { schema, cluster, kafka }
+        Generator {
+            schema,
+            cluster,
+            kafka,
+        }
     }
 
     pub fn generate_up(&self) -> String {
-        vec![
-            self.streams_table(),
+        [self.streams_table(),
             self.raw_table(),
             self.datalake_table(),
             self.raw_mv(),
-            self.streams_mv(),
-        ]
+            self.streams_mv()]
         .join("\n\n")
     }
 
@@ -77,7 +79,13 @@ impl<'a> Generator<'a> {
             .schema
             .columns
             .iter()
-            .map(|col| format!("\t`{}` {},\n", col.name, col.ch_type.as_nullable_str()))
+            .map(|col| {
+                format!(
+                    "\t`{}` {},\n",
+                    col.name,
+                    col.ch_type.as_ch_str(col.nullable)
+                )
+            })
             .collect();
         format!(
             "CREATE TABLE IF NOT EXISTS datalake.{t} ON CLUSTER {c}\n\
@@ -105,7 +113,7 @@ impl<'a> Generator<'a> {
                 format!(
                     "\t\tJSONExtract(message, '{}', '{}') AS {},\n",
                     col.name,
-                    col.ch_type.as_nullable_str(),
+                    col.ch_type.as_ch_str(col.nullable),
                     col.name
                 )
             })

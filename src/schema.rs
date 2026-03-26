@@ -7,6 +7,15 @@ pub enum ColumnType {
 }
 
 impl ColumnType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ColumnType::String => "String",
+            ColumnType::Int64 => "Int64",
+            ColumnType::Float64 => "Float64",
+            ColumnType::Bool => "Bool",
+        }
+    }
+
     pub fn as_nullable_str(&self) -> &'static str {
         match self {
             ColumnType::String => "Nullable(String)",
@@ -15,11 +24,20 @@ impl ColumnType {
             ColumnType::Bool => "Nullable(Bool)",
         }
     }
+
+    pub fn as_ch_str(&self, nullable: bool) -> &'static str {
+        if nullable {
+            self.as_nullable_str()
+        } else {
+            self.as_str()
+        }
+    }
 }
 
 pub struct Column {
     pub name: String,
     pub ch_type: ColumnType,
+    pub nullable: bool,
 }
 
 pub struct InferredSchema {
