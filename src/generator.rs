@@ -30,11 +30,11 @@ impl<'a> Generator<'a> {
         let t = &self.schema.table_name;
         let c = &self.cluster;
         format!(
-            "DROP MATERIALIZED VIEW IF EXISTS streams.{t}_mv ON CLUSTER {c};\n\
-             DROP MATERIALIZED VIEW IF EXISTS raw.{t}_mv ON CLUSTER {c};\n\
-             DROP TABLE IF EXISTS datalake.{t} ON CLUSTER {c};\n\
-             DROP TABLE IF EXISTS raw.{t} ON CLUSTER {c};\n\
-             DROP TABLE IF EXISTS streams.{t} ON CLUSTER {c};"
+            "DROP TABLE IF EXISTS streams.{t} ON CLUSTER {c} SYNC;\n\
+             DROP VIEW IF EXISTS streams.{t}_mv ON CLUSTER {c} SYNC;\n\
+             DROP TABLE IF EXISTS raw.{t} ON CLUSTER {c} SYNC;\n\
+             DROP VIEW IF EXISTS raw.{t}_mv ON CLUSTER {c} SYNC;\n\
+             DROP TABLE IF EXISTS datalake.{t} ON CLUSTER {c} SYNC;"
         )
     }
 
