@@ -9,6 +9,29 @@ use generator::{Generator, TableGenerator};
 use std::fs;
 use std::path::Path;
 
+fn print_schema_summary(schema: &schema::InferredSchema) {
+    let max_len = schema
+        .columns
+        .iter()
+        .map(|c| c.name.len())
+        .max()
+        .unwrap_or(0);
+    eprintln!(
+        "{} columns inferred from {}\n",
+        schema.columns.len(),
+        schema.table_name
+    );
+    for col in &schema.columns {
+        eprintln!(
+            "  {:<width$}  {}",
+            col.name,
+            col.ch_type.as_str(),
+            width = max_len
+        );
+    }
+    eprintln!();
+}
+
 fn table_name_from(name: Option<String>, input: &Path) -> String {
     name.unwrap_or_else(|| {
         input
@@ -54,6 +77,7 @@ fn main() {
                 eprintln!("Error inferring schema: {}", e);
                 std::process::exit(1);
             });
+            print_schema_summary(&schema);
             let generator = Generator::new(&schema, args.cluster, args.kafka);
             write_migrations(
                 generator.generate_up(),
@@ -130,6 +154,7 @@ fn main() {
                     })
             };
 
+            print_schema_summary(&schema);
             let generator = TableGenerator::new(&schema, engine_config, args.cluster);
             write_migrations(
                 generator.generate_up(),

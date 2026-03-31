@@ -61,16 +61,6 @@ pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, S
         })
         .collect();
 
-    let max_len = columns.iter().map(|c| c.name.len()).max().unwrap_or(0);
-    eprintln!("{} columns infered from {}\n", columns.len(), table_name);
-    for col in &columns {
-        eprintln!(
-            "  {:<width$}  {}",
-            col.name,
-            col.ch_type.as_str(),
-            width = max_len
-        );
-    }
     Ok(InferredSchema {
         table_name: table_name.to_string(),
         columns,
