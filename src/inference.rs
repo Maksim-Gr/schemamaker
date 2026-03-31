@@ -77,6 +77,19 @@ pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, S
     })
 }
 
+pub fn record_count(content: &str) -> usize {
+    let trimmed = content.trim();
+    if trimmed.starts_with('[') {
+        serde_json::from_str::<Vec<Value>>(trimmed)
+            .map(|v| v.len())
+            .unwrap_or(0)
+    } else {
+        serde_json::Deserializer::from_str(trimmed)
+            .into_iter::<Value>()
+            .count()
+    }
+}
+
 fn infer_type(val: &Value) -> ColumnType {
     match val {
         Value::Bool(_) => ColumnType::Bool,
