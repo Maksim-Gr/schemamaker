@@ -44,3 +44,35 @@ pub struct InferredSchema {
     pub table_name: String,
     pub columns: Vec<Column>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)] // names match ClickHouse engine names intentionally
+pub enum TableEngine {
+    MergeTree,
+    ReplicatedMergeTree,
+    ReplacingMergeTree,
+    SummingMergeTree,
+}
+
+impl std::str::FromStr for TableEngine {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "MergeTree" => Ok(TableEngine::MergeTree),
+            "ReplicatedMergeTree" => Ok(TableEngine::ReplicatedMergeTree),
+            "ReplacingMergeTree" => Ok(TableEngine::ReplacingMergeTree),
+            "SummingMergeTree" => Ok(TableEngine::SummingMergeTree),
+            other => Err(format!(
+                "unknown engine '{}'; valid options: MergeTree, ReplicatedMergeTree, ReplacingMergeTree, SummingMergeTree",
+                other
+            )),
+        }
+    }
+}
+
+pub struct EngineConfig {
+    pub engine: TableEngine,
+    pub order_by: Vec<String>,
+    pub sum_columns: Vec<String>,
+}

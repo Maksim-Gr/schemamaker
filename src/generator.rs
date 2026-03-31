@@ -1,4 +1,4 @@
-use crate::schema::InferredSchema;
+use crate::schema::{EngineConfig, InferredSchema, TableEngine};
 
 pub struct Generator<'a> {
     schema: &'a InferredSchema,
@@ -159,5 +159,114 @@ impl<'a> Generator<'a> {
              \tnowInBlock() AS _row_created\n\
              FROM streams.{t};"
         )
+    }
+}
+
+pub struct TableGenerator<'a> {
+    schema: &'a InferredSchema,
+    config: EngineConfig,
+    cluster: Option<String>,
+}
+
+impl<'a> TableGenerator<'a> {
+    pub fn new(schema: &'a InferredSchema, config: EngineConfig, cluster: Option<String>) -> Self {
+        TableGenerator {
+            schema,
+            config,
+            cluster,
+        }
+    }
+
+    pub fn generate_up(&self) -> String {
+        let t = &self.schema.table_name;
+
+        let cluster_clause = self
+            .cluster
+            .as_ref()
+            .map(|c| format!(" ON CLUSTER {c}"))
+            .unwrap_or_default();
+
+        let cols: String = self
+            .schema
+            .columns
+            .iter()
+            .map(|col| {
+                format!(
+                    "\t`{}` {},\n",
+                    col.name,
+                    col.ch_type.as_ch_str(col.nullable)
+                )
+            })
+            .collect();
+        // strip trailing comma+newline from last column
+        let cols = cols.trim_end_matches(",\n").to_string() + "\n";
+
+        let engine_str = self.engine_str();
+
+        let order_str = if self.config.order_by.is_empty() {
+            "tuple()".to_string()
+        } else {
+            format!("({})", self.config.order_by.join(", "))
+        };
+
+        // Add PARTITION BY only when we have a clear timestamp ORDER BY field
+        let partition_clause = if let Some(first) = self.config.order_by.first() {
+            // heuristic: if the first order-by field looks like a timestamp, partition by it
+            let lower = first.to_lowercase();
+            let is_ts = lower.ends_with("_at")
+                || lower.ends_with("_time")
+                || lower.ends_with("_date")
+                || lower == "timestamp"
+                || lower == "date"
+                || lower == "created_at"
+                || lower == "updated_at"
+                || lower == "event_time";
+            if is_ts {
+                format!("\tPARTITION BY toYYYYMM({first})\n")
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        format!(
+            "CREATE TABLE IF NOT EXISTS {t}{cluster_clause}\n\
+             (\n\
+             {cols}\
+             )\n\
+             \tENGINE = {engine_str}\n\
+             {partition_clause}\
+             \tORDER BY {order_str}\n\
+             \tSETTINGS index_granularity = 8192;"
+        )
+    }
+
+    pub fn generate_down(&self) -> String {
+        let t = &self.schema.table_name;
+        match &self.cluster {
+            Some(c) => format!("DROP TABLE IF EXISTS {t} ON CLUSTER {c} SYNC;"),
+            None => format!("DROP TABLE IF EXISTS {t};"),
+        }
+    }
+
+    fn engine_str(&self) -> String {
+        let t = &self.schema.table_name;
+        match &self.config.engine {
+            TableEngine::MergeTree => "MergeTree()".to_string(),
+            TableEngine::ReplicatedMergeTree => {
+                format!(
+                    "ReplicatedMergeTree('/clickhouse/{{cluster}}/tables/{t}/{{shard}}', '{{replica}}')"
+                )
+            }
+            TableEngine::ReplacingMergeTree => "ReplacingMergeTree()".to_string(),
+            TableEngine::SummingMergeTree => {
+                if self.config.sum_columns.is_empty() {
+                    "SummingMergeTree()".to_string()
+                } else {
+                    format!("SummingMergeTree({})", self.config.sum_columns.join(", "))
+                }
+            }
+        }
     }
 }

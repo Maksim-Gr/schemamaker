@@ -61,20 +61,23 @@ pub fn infer_schema(content: &str, table_name: &str) -> Result<InferredSchema, S
         })
         .collect();
 
-    let max_len = columns.iter().map(|c| c.name.len()).max().unwrap_or(0);
-    eprintln!("{} columns infered from {}\n", columns.len(), table_name);
-    for col in &columns {
-        eprintln!(
-            "  {:<width$}  {}",
-            col.name,
-            col.ch_type.as_str(),
-            width = max_len
-        );
-    }
     Ok(InferredSchema {
         table_name: table_name.to_string(),
         columns,
     })
+}
+
+pub fn record_count(content: &str) -> usize {
+    let trimmed = content.trim();
+    if trimmed.starts_with('[') {
+        serde_json::from_str::<Vec<Value>>(trimmed)
+            .map(|v| v.len())
+            .unwrap_or(0)
+    } else {
+        serde_json::Deserializer::from_str(trimmed)
+            .into_iter::<Value>()
+            .count()
+    }
 }
 
 fn infer_type(val: &Value) -> ColumnType {
