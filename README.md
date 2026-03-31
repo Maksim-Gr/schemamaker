@@ -40,16 +40,24 @@ The binary is at `./target/release/schemamaker`.
 ## Usage
 
 ```bash
-schemamaker [OPTIONS] <INPUT>
+schemamaker <COMMAND> [OPTIONS] <INPUT>
 ```
 
-### Arguments
+### Commands
 
-| Argument | Description |
-|----------|-------------|
-| `<INPUT>` | Path to a JSON file (NDJSON, pretty-printed, or JSON array) |
+| Command | Description |
+|---------|-------------|
+| `kafka` | Generate full Kafka→ClickHouse pipeline migrations (streams, raw, datalake) |
+| `scan`  | Scan JSON fields and suggest suitable ClickHouse table engines |
+| `table` | Generate a simple `CREATE TABLE` migration from JSON |
 
-### Options
+---
+
+### `kafka`
+
+```bash
+schemamaker kafka [OPTIONS] <INPUT>
+```
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -58,25 +66,97 @@ schemamaker [OPTIONS] <INPUT>
 | `-k, --kafka <KAFKA>` | `kafka` | Kafka collection name |
 | `-o, --output-dir <DIR>` | `.` | Output directory for generated SQL files |
 
-## Examples
-
 ```bash
-# Infer schema from video_events.json, use all defaults
-schemamaker video_events.json
-# → video_events_up.sql
-# → video_events_down.sql
-
-# Override table name
-schemamaker video_events.json -n my_table
-
-# Override cluster and kafka collection
-schemamaker video_events.json -c my_cluster -k my_kafka
-
-# All overrides, write to a specific directory
-schemamaker video_events.json -n my_table -c my_cluster -k my_kafka -o migrations/
+schemamaker kafka video_events.json
+schemamaker kafka video_events.json -n my_table -c my_cluster -k my_kafka -o migrations/
 ```
 
-## Why this migration flow
+---
+
+### `scan`
+
+Analyzes JSON fields, classifies them (Timestamp-like, ID-like, Numeric), and prints engine suggestions with `ORDER BY` recommendations.
+
+```bash
+schemamaker scan [OPTIONS] <INPUT>
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n, --name <NAME>` | input filename stem | Override the table name |
+| `-c, --cluster <CLUSTER>` | — | If set, suggests `ReplicatedMergeTree` variants |
+
+```bash
+schemamaker scan video_events.json
+schemamaker scan video_events.json -c my_cluster
+```
+
+Example output:
+```
+Field analysis: video_events.json  (4 records, 13 fields)
+
+  event_id              String            required → ID-like
+  user_id               Int64             required → ID-like
+  event_time            String            required → Timestamp-like
+  amount                Float64           nullable → Numeric
+  status                String            nullable
+
+Suggested engines:
+
+  1. MergeTree
+     ORDER BY (event_time)
+     → general purpose time-series table
+
+  2. ReplacingMergeTree
+     ORDER BY (event_id, event_time)
+     → deduplicates rows by `event_id` — good for upsert-like data
+
+  3. SummingMergeTree
+     ORDER BY (event_id, event_time)
+     SUM COLUMNS (amount)
+     → pre-aggregates `amount` — good for metrics/counters
+
+Run with chosen engine:
+  schemamaker table video_events.json --engine MergeTree
+  schemamaker table video_events.json --engine ReplacingMergeTree
+  schemamaker table video_events.json --engine SummingMergeTree
+```
+
+---
+
+### `table`
+
+Generates a single `CREATE TABLE` / `DROP TABLE` migration. Use `scan` first to pick the right engine.
+
+```bash
+schemamaker table [OPTIONS] <INPUT>
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n, --name <NAME>` | input filename stem | Override the table name |
+| `-e, --engine <ENGINE>` | inferred (MergeTree) | `MergeTree`, `ReplicatedMergeTree`, `ReplacingMergeTree`, `SummingMergeTree` |
+| `--order-by <FIELDS>` | inferred from field names | Comma-separated `ORDER BY` fields |
+| `-c, --cluster <CLUSTER>` | — | Adds `ON CLUSTER` clause; required for `ReplicatedMergeTree` |
+| `-o, --output-dir <DIR>` | `.` | Output directory for generated SQL files |
+
+```bash
+# Auto-infer engine (defaults to MergeTree)
+schemamaker table video_events.json
+
+# Explicit engine
+schemamaker table video_events.json --engine ReplacingMergeTree
+
+# Replicated with cluster
+schemamaker table video_events.json --engine ReplicatedMergeTree -c my_cluster
+
+# Override ORDER BY
+schemamaker table video_events.json --engine MergeTree --order-by user_id,event_time
+```
+
+---
+
+## Why the Kafka migration flow
 
 Ingesting Kafka events into ClickHouse reliably requires three layers and two materialized views connecting them:
 
@@ -98,6 +178,8 @@ datalake.{name}         # typed, queryable table — each field JSONExtracted fr
 
 ## Output
 
+### `kafka`
+
 Two SQL files are written to the output directory:
 
 **`{name}_up.sql`** — creates 5 objects in order:
@@ -108,6 +190,12 @@ Two SQL files are written to the output directory:
 5. `streams.{name}_mv` — materialized view that moves Kafka messages → `raw`
 
 **`{name}_down.sql`** — drops all 5 objects in reverse dependency order.
+
+### `table`
+
+**`{name}_up.sql`** — single `CREATE TABLE IF NOT EXISTS` statement with the chosen engine, inferred columns, `ORDER BY`, and optional `PARTITION BY` (when the first `ORDER BY` field looks like a timestamp).
+
+**`{name}_down.sql`** — single `DROP TABLE IF EXISTS` statement.
 
 ## Type Inference
 
@@ -121,6 +209,6 @@ Types are inferred by scanning every record and widening as needed:
 | boolean | `Nullable(Bool)` |
 | null / array / object | `Nullable(String)` |
 
-If the same field appears as `Int64` in one record and `Float64` in another, it widens to `Nullable(Float64)`. Any other type conflict widens to `Nullable(String)`. All columns are nullable unconditionally.
+If the same field appears as `Int64` in one record and `Float64` in another, it widens to `Nullable(Float64)`. Any other type conflict widens to `Nullable(String)`.
 
-Field order in the output matches the first record that introduced each field.
+A field is non-nullable only if it is present in every record. Field order in the output matches the first record that introduced each field.
