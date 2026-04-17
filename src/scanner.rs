@@ -231,7 +231,7 @@ pub fn print_scan(result: &ScanResult, source: &str, record_count: usize) {
         println!("     → {}\n", s.rationale);
     }
 
-    println!("Run with chosen engine:");
+    println!("To generate a migration with the chosen engine, run:");
     let input = source;
     for s in &result.suggestions {
         let engine_name = match &s.engine {
@@ -240,6 +240,15 @@ pub fn print_scan(result: &ScanResult, source: &str, record_count: usize) {
             TableEngine::ReplacingMergeTree => "ReplacingMergeTree",
             TableEngine::SummingMergeTree => "SummingMergeTree",
         };
-        println!("  schemamaker table {} --engine {}", input, engine_name);
+        if s.order_by.is_empty() {
+            println!("  schemamaker table {} --engine {}", input, engine_name);
+        } else {
+            println!(
+                "  schemamaker table {} --engine {} --order-by {}",
+                input,
+                engine_name,
+                s.order_by.join(",")
+            );
+        }
     }
 }

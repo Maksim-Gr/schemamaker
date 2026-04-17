@@ -5,6 +5,7 @@ use std::path::PathBuf;
 #[command(
     name = "schemamaker",
     about = "Generate ClickHouse migrations from a JSON file",
+    long_about = "Generate ClickHouse migrations from a JSON file.\n\nSubcommands:\n  scan    Analyze fields and pick an engine\n  table   Generate a CREATE TABLE migration\n  kafka   Generate a full Kafka→ClickHouse pipeline\n\nTip: start with `schemamaker scan <file.ndjson>` if unsure which engine to use.",
     version = "0.1.3-beta"
 )]
 pub struct Cli {
@@ -24,7 +25,7 @@ pub enum Commands {
 
 #[derive(Parser, Debug)]
 pub struct KafkaArgs {
-    /// JSONEachRow input file
+    /// Path to a NDJSON file (one JSON object per line)
     pub input: PathBuf,
     /// Override table name (defaults to input file stem)
     #[arg(short, long)]
@@ -42,19 +43,19 @@ pub struct KafkaArgs {
 
 #[derive(Parser, Debug)]
 pub struct ScanArgs {
-    /// JSONEachRow input file
+    /// Path to a NDJSON file (one JSON object per line)
     pub input: PathBuf,
     /// Override table name (defaults to input file stem)
     #[arg(short, long)]
     pub name: Option<String>,
-    /// If set, suggest Replicated engine variants
+    /// Cluster name; when provided, includes ReplicatedMergeTree in suggestions
     #[arg(short, long)]
     pub cluster: Option<String>,
 }
 
 #[derive(Parser, Debug)]
 pub struct TableArgs {
-    /// JSONEachRow input file
+    /// Path to a NDJSON file (one JSON object per line)
     pub input: PathBuf,
     /// Override table name (defaults to input file stem)
     #[arg(short, long)]
@@ -63,7 +64,7 @@ pub struct TableArgs {
     /// If omitted, inferred automatically from JSON fields
     #[arg(short, long)]
     pub engine: Option<String>,
-    /// Comma-separated ORDER BY fields (overrides inference)
+    /// Comma-separated ORDER BY fields, e.g. 'id,created_at' (overrides inference)
     #[arg(long)]
     pub order_by: Option<String>,
     /// ClickHouse cluster name (required for ReplicatedMergeTree)
