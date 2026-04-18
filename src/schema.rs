@@ -71,6 +71,18 @@ impl std::str::FromStr for TableEngine {
     }
 }
 
+impl std::fmt::Display for TableEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TableEngine::MergeTree => "MergeTree",
+            TableEngine::ReplicatedMergeTree => "ReplicatedMergeTree",
+            TableEngine::ReplacingMergeTree => "ReplacingMergeTree",
+            TableEngine::SummingMergeTree => "SummingMergeTree",
+        };
+        f.write_str(s)
+    }
+}
+
 pub struct EngineConfig {
     pub engine: TableEngine,
     pub order_by: Vec<String>,

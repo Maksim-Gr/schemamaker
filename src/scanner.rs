@@ -212,13 +212,7 @@ pub fn print_scan(result: &ScanResult, source: &str, record_count: usize) {
     println!("\nSuggested engines:\n");
 
     for (i, s) in result.suggestions.iter().enumerate() {
-        let engine_name = match &s.engine {
-            TableEngine::MergeTree => "MergeTree",
-            TableEngine::ReplicatedMergeTree => "ReplicatedMergeTree",
-            TableEngine::ReplacingMergeTree => "ReplacingMergeTree",
-            TableEngine::SummingMergeTree => "SummingMergeTree",
-        };
-        println!("  {}. {}", i + 1, engine_name);
+        println!("  {}. {}", i + 1, s.engine);
         let order_str = if s.order_by.is_empty() {
             "tuple()".to_string()
         } else {
