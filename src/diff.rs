@@ -127,6 +127,42 @@ mod tests {
     }
 
     #[test]
+    fn identical_schemas_produce_no_changes() {
+        let old = infer_schema(r#"[{"a":1,"b":"x"}]"#, "t").unwrap();
+        let new = infer_schema(r#"[{"a":1,"b":"x"}]"#, "t").unwrap();
+        let d = diff_schemas(&old, &new, "t", None);
+        assert!(d.up.is_empty());
+        assert!(d.down.is_empty());
+        assert!(d.warnings.is_empty());
+    }
+
+    #[test]
+    fn combined_add_remove_and_type_change() {
+        // old: a (kept, unchanged), b (removed), c (type change Int64 -> String)
+        // new: a (unchanged), c (String), d (added)
+        let old = infer_schema(r#"[{"a":1,"b":2,"c":3}]"#, "t").unwrap();
+        let new = infer_schema(r#"[{"a":1,"c":"x","d":true}]"#, "t").unwrap();
+        let d = diff_schemas(&old, &new, "t", None);
+
+        assert!(d.up.contains("ADD COLUMN IF NOT EXISTS `d`"));
+        assert!(!d.up.contains("`a`"));
+        assert!(!d.up.contains("`b`"));
+        assert!(!d.up.contains("`c`"));
+        assert!(d.down.contains("DROP COLUMN IF EXISTS `d`"));
+
+        assert!(
+            d.warnings
+                .iter()
+                .any(|w| w.contains("`b`") && w.contains("not new"))
+        );
+        assert!(
+            d.warnings
+                .iter()
+                .any(|w| w.contains("`c`") && w.contains("changed type"))
+        );
+    }
+
+    #[test]
     fn cluster_adds_on_cluster() {
         let old = infer_schema(r#"[{"a":1}]"#, "t").unwrap();
         let new = infer_schema(r#"[{"a":1,"b":2}]"#, "t").unwrap();

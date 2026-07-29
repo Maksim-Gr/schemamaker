@@ -126,3 +126,188 @@ fn table_name_override_via_flag() {
     assert!(stdout.contains("custom"));
     assert!(!stdout.contains("sample"));
 }
+
+#[test]
+fn table_subcommand_without_stdout_writes_migration_files() {
+    let dir = std::env::temp_dir().join(format!(
+        "clickforge_test_write_{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let output = clickforge()
+        .args([
+            "table",
+            &fixture("sample.json"),
+            "--name",
+            "written",
+            "--output-dir",
+            dir.to_str().unwrap(),
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(output.status.success());
+
+    let up = std::fs::read_to_string(dir.join("written_up.sql")).unwrap();
+    let down = std::fs::read_to_string(dir.join("written_down.sql")).unwrap();
+    assert!(up.contains("CREATE TABLE"));
+    assert!(down.contains("DROP TABLE"));
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn malformed_json_input_reports_schema_error() {
+    let output = clickforge()
+        .args(["table", &fixture("malformed.json"), "--stdout"])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Error: inferring schema"));
+}
+
+#[test]
+fn empty_array_input_reports_schema_error() {
+    let output = clickforge()
+        .args(["table", &fixture("empty.json"), "--stdout"])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("empty or contains no JSON objects"));
+}
+
+#[test]
+fn nonexistent_input_file_reports_read_error() {
+    let output = clickforge()
+        .args(["table", "does-not-exist.json", "--stdout"])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Error: reading"));
+}
+
+#[test]
+fn invalid_engine_flag_reports_error() {
+    let output = clickforge()
+        .args([
+            "table",
+            &fixture("sample.json"),
+            "--engine",
+            "NotAnEngine",
+            "--stdout",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("unknown engine"));
+}
+
+#[test]
+fn top_level_help_flag_prints_usage() {
+    let output = clickforge()
+        .args(["--help"])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Usage"));
+}
+
+#[test]
+fn subcommand_help_flag_prints_subcommand_usage() {
+    let output = clickforge()
+        .args(["table", "--help"])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--engine"));
+}
+
+#[test]
+fn diff_with_no_changes_reports_no_changes_detected() {
+    let output = clickforge()
+        .args([
+            "diff",
+            &fixture("old.json"),
+            &fixture("old.json"),
+            "--stdout",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stderr.contains("No changes detected."));
+    assert!(!stdout.contains("ALTER TABLE"));
+}
+
+#[test]
+fn table_engine_flag_selects_replicated_merge_tree() {
+    let output = clickforge()
+        .args([
+            "table",
+            &fixture("sample.json"),
+            "--engine",
+            "ReplicatedMergeTree",
+            "--stdout",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("ReplicatedMergeTree('/clickhouse/"));
+}
+
+#[test]
+fn table_cluster_flag_adds_on_cluster_clause() {
+    let output = clickforge()
+        .args([
+            "table",
+            &fixture("sample.json"),
+            "--cluster",
+            "ck",
+            "--stdout",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("ON CLUSTER ck"));
+}
+
+#[test]
+fn table_order_by_flag_overrides_suggested_order() {
+    // --order-by is only honored alongside an explicit --engine (main.rs picks the
+    // scanner's own suggestion otherwise), so both flags are required here.
+    let output = clickforge()
+        .args([
+            "table",
+            &fixture("sample.json"),
+            "--engine",
+            "MergeTree",
+            "--order-by",
+            "user_id",
+            "--stdout",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run clickforge");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("ORDER BY (`user_id`)"));
+}
