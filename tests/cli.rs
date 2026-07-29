@@ -129,10 +129,7 @@ fn table_name_override_via_flag() {
 
 #[test]
 fn table_subcommand_without_stdout_writes_migration_files() {
-    let dir = std::env::temp_dir().join(format!(
-        "clickforge_test_write_{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("clickforge_test_write_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
 
     let output = clickforge()

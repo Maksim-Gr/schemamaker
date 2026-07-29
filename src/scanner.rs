@@ -313,10 +313,16 @@ mod tests {
 
     #[test]
     fn replicated_scan_suggests_replicated_merge_tree() {
-        let schema = infer_schema(r#"[{"user_id":"u1","event_time":"2024-03-01T00:00:00Z"}]"#, "t")
-            .unwrap();
+        let schema = infer_schema(
+            r#"[{"user_id":"u1","event_time":"2024-03-01T00:00:00Z"}]"#,
+            "t",
+        )
+        .unwrap();
         let result = scan(&schema, true);
-        assert_eq!(result.suggestions[0].engine, TableEngine::ReplicatedMergeTree);
+        assert_eq!(
+            result.suggestions[0].engine,
+            TableEngine::ReplicatedMergeTree
+        );
     }
 
     #[test]

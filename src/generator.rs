@@ -357,7 +357,9 @@ mod tests {
             sum_columns: vec![],
         };
         let sql = TableGenerator::new(&schema, config, None).generate_up();
-        assert!(sql.contains("ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/t/{shard}', '{replica}')"));
+        assert!(sql.contains(
+            "ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/t/{shard}', '{replica}')"
+        ));
     }
 
     #[test]
