@@ -312,6 +312,40 @@ mod tests {
     }
 
     #[test]
+    fn replicated_scan_suggests_replicated_merge_tree() {
+        let schema = infer_schema(
+            r#"[{"user_id":"u1","event_time":"2024-03-01T00:00:00Z"}]"#,
+            "t",
+        )
+        .unwrap();
+        let result = scan(&schema, true);
+        assert_eq!(
+            result.suggestions[0].engine,
+            TableEngine::ReplicatedMergeTree
+        );
+    }
+
+    #[test]
+    fn suggests_replacing_merge_tree_for_id_and_timestamp() {
+        let schema = infer_schema(
+            r#"[{"user_id":"u1","event_time":"2024-03-01T00:00:00Z","name":"a"}]"#,
+            "t",
+        )
+        .unwrap();
+        let result = scan(&schema, false);
+        let replacing = result
+            .suggestions
+            .iter()
+            .find(|s| s.engine == TableEngine::ReplacingMergeTree)
+            .expect("expected a ReplacingMergeTree suggestion");
+        assert_eq!(
+            replacing.order_by,
+            vec!["user_id".to_string(), "event_time".to_string()]
+        );
+        assert!(replacing.rationale.contains("dedup"));
+    }
+
+    #[test]
     fn no_summing_without_numeric_metric() {
         let schema = infer_schema(
             r#"[{"user_id":"u1","event_time":"2024-03-01T00:00:00Z"}]"#,

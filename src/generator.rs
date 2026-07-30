@@ -349,6 +349,80 @@ mod tests {
     }
 
     #[test]
+    fn engine_str_replicated_merge_tree() {
+        let schema = schema_with(vec![col("a", ColumnType::String)]);
+        let config = EngineConfig {
+            engine: TableEngine::ReplicatedMergeTree,
+            order_by: vec![],
+            sum_columns: vec![],
+        };
+        let sql = TableGenerator::new(&schema, config, None).generate_up();
+        assert!(sql.contains(
+            "ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/t/{shard}', '{replica}')"
+        ));
+    }
+
+    #[test]
+    fn engine_str_replacing_merge_tree() {
+        let schema = schema_with(vec![col("a", ColumnType::String)]);
+        let config = EngineConfig {
+            engine: TableEngine::ReplacingMergeTree,
+            order_by: vec![],
+            sum_columns: vec![],
+        };
+        let sql = TableGenerator::new(&schema, config, None).generate_up();
+        assert!(sql.contains("ENGINE = ReplacingMergeTree()"));
+    }
+
+    #[test]
+    fn engine_str_summing_merge_tree_with_sum_columns() {
+        let schema = schema_with(vec![col("amount", ColumnType::Int64)]);
+        let config = EngineConfig {
+            engine: TableEngine::SummingMergeTree,
+            order_by: vec![],
+            sum_columns: vec!["amount".to_string()],
+        };
+        let sql = TableGenerator::new(&schema, config, None).generate_up();
+        assert!(sql.contains("ENGINE = SummingMergeTree(`amount`)"));
+    }
+
+    #[test]
+    fn generate_down_with_cluster() {
+        let schema = schema_with(vec![col("a", ColumnType::String)]);
+        let config = EngineConfig {
+            engine: TableEngine::MergeTree,
+            order_by: vec![],
+            sum_columns: vec![],
+        };
+        let sql = TableGenerator::new(&schema, config, Some("ck".to_string())).generate_down();
+        assert_eq!(sql, "DROP TABLE IF EXISTS `t` ON CLUSTER ck SYNC;");
+    }
+
+    #[test]
+    fn generate_down_without_cluster() {
+        let schema = schema_with(vec![col("a", ColumnType::String)]);
+        let config = EngineConfig {
+            engine: TableEngine::MergeTree,
+            order_by: vec![],
+            sum_columns: vec![],
+        };
+        let sql = TableGenerator::new(&schema, config, None).generate_down();
+        assert_eq!(sql, "DROP TABLE IF EXISTS `t`;");
+    }
+
+    #[test]
+    fn generate_up_with_cluster_adds_on_cluster_clause() {
+        let schema = schema_with(vec![col("a", ColumnType::String)]);
+        let config = EngineConfig {
+            engine: TableEngine::MergeTree,
+            order_by: vec![],
+            sum_columns: vec![],
+        };
+        let sql = TableGenerator::new(&schema, config, Some("ck".to_string())).generate_up();
+        assert!(sql.contains("`t` ON CLUSTER ck"));
+    }
+
+    #[test]
     fn column_name_with_quote_is_escaped_in_kafka_pipeline() {
         let schema = schema_with(vec![col("it's", ColumnType::String)]);
         let generator = Generator::new(&schema, "cluster".to_string(), "kafka".to_string());
